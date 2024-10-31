@@ -6,9 +6,11 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Edge;
 using OpenQA.Selenium.Interactions;
+using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Security.Policy;
 using System.Text;
@@ -31,6 +33,7 @@ namespace ConsoleApp1
         bool shouldAddForwadedTime = false;
         string urlWithPlaceholder = "";
         ILog _log;
+        List<string> exsitingIds = new List<string>();
         public ReportGenerator(ILog log)
         {
             Setup();
@@ -49,7 +52,7 @@ namespace ConsoleApp1
             //last week urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
             var stateRowProcessed = StateManager.ReadApplicationState();
             _log.Info("Retrieved row state " + stateRowProcessed);
-            Const.urlPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
+            //Const.urlPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
             var url = "";
             if(stateRowProcessed != -1)
             {
@@ -63,15 +66,17 @@ namespace ConsoleApp1
 
             Console.WriteLine("Log in with 2FA and press enter in console after that:");
             Console.ReadLine();
-
-            OpenTabs(driver);
+            //exsitingIds = ExcelHelper.GetIdsFromExcel("ticketReport_time_20240623_173045_fromRow_1.xlsx");
+            //var exsitingIds2 = ExcelHelper.GetIdsFromExcel("ticketReport_time_20240623_212530_fromRow_1316.xlsx");
+            //exsitingIds.AddRange(exsitingIds2);
+            //OpenTabs(driver);
             //((IJavaScriptExecutor)driver).ExecuteScript("window.open();");
             //List<string> tabs = new List<string>(driver.WindowHandles);
             //driver.SwitchTo().Window(tabs[1]);
             driver.Navigate().GoToUrl(url);
             
             //retrieve links
-            List<string> urlsForTicketDetails = new List<string>();
+            List<SearchResultData> urlsForTicketDetails = new List<SearchResultData>();
             var ticketRowsProcessed = GetTicketUrls(urlsForTicketDetails);
 
             _log.Info("Last ticket row retrieved" + ticketRowsProcessed);
@@ -84,31 +89,23 @@ namespace ConsoleApp1
 
         }
 
-        private void OpenTabs(ChromeDriver driver)
-        {
-            for(int i = 0; i < Const.numberOfTabs; i++) 
-            {
-                ((IJavaScriptExecutor)driver).ExecuteScript("window.open();");
 
-                //driver.FindElement(By.CssSelector("body")).SendKeys(Keys.Control + "t");
-            }
-        }
 
-        private List<Record> GenerateRecords(List<string> urlsForTicketDetails)
+        private List<Record> GenerateRecords(List<SearchResultData> urlsForTicketDetails)
         {
             List<Record> records = new List<Record>();
             var counter = 0;
+
             // generate records
             do
             {
-                var urls = urlsForTicketDetails.Skip(counter * Const.numberOfTabs).Take(Const.numberOfTabs).ToList();
                 try
                 {
                     driver.SwitchTo().Window(driver.WindowHandles[0]);
-
+                    //var nextUrls = urlsForTicketDetails.Skip((counter + 1) * Const.numberOfTabs).Take(Const.numberOfTabs).ToList();
+                    var urls = urlsForTicketDetails.Skip(counter * Const.numberOfTabs).Take(Const.numberOfTabs).ToList();
                     LoadUrlsIntoTabs(urls);
-
-                    for (int i = 0; i < urls.Count; i++)
+                    for (var i = 0; i < urls.Count; i++)
                     {
                         var url = urls[i];
                         driver.SwitchTo().Window(driver.WindowHandles[urls.Count - i]);
@@ -130,16 +127,23 @@ namespace ConsoleApp1
                 counter++;
             }
             while (counter * Const.numberOfTabs < urlsForTicketDetails.Count);
+
+
             driver.SwitchTo().Window(driver.WindowHandles[0]);
             return records;
         }
 
-        private void LoadUrlsIntoTabs(List<string> urls)
+        private void LoadUrlsIntoTabs(List<SearchResultData> urls)
         {
             for(int i = 0;i < urls.Count;i++)
             {
-                ((IJavaScriptExecutor)driver).ExecuteScript($"window.open('{urls[i]}', '_blank')");
+                ((IJavaScriptExecutor)driver).ExecuteScript($"window.open('{urls[i].Url}', '_blank')");
             }
+        }
+
+        private void RedirectTab(string url)
+        {
+            ((IJavaScriptExecutor)driver).ExecuteAsyncScript($"window.location = '{url}'");
         }
 
         private void CloseTabs(List<string> urls)
@@ -151,7 +155,7 @@ namespace ConsoleApp1
             }
         }
 
-        private int GetTicketUrls(List<string> urlsForTicketDetails)
+        private int GetTicketUrls(List<SearchResultData> urlsForTicketDetails)
         {
             var totalRowsElement = driver.FindElement(By.CssSelector(".list_nav_bottom "));
             var totalRowsText = totalRowsElement.Text;
@@ -179,7 +183,7 @@ namespace ConsoleApp1
                     if (prevTotalRowsText != totalRowsText)
                     {
                         prevTotalRowsText = totalRowsText;
-                        var table = driver.FindElement(By.Id("task_table"));
+                        var table = driver.FindElement(By.Id("metric_instance_table"));
                         var rows = table.FindElements(By.TagName("tr")).Skip(2);
                         GetTaskItemsUrls(rows, urlsForTicketDetails);
                         if(urlsForTicketDetails.Count >= Const.BatchSizeTicketGenerate) 
@@ -220,7 +224,7 @@ namespace ConsoleApp1
             return ticketRowsProcessed;
         }
 
-        private void GenerateRecordsFromUrl(string ticketUrl, List<Record> records)
+        private void GenerateRecordsFromUrl(SearchResultData ticketUrl, List<Record> records)
         {
             var ticketIdElements = driver.FindElement(By.CssSelector("#sys_readonly\\.incident\\.number, #sys_readonly\\.sc_req_item\\.number"));
             var ticketId = ticketIdElements.GetDomAttribute("value");
@@ -278,7 +282,14 @@ namespace ConsoleApp1
                 }
             }
 
-            var record = new Record() { AllConnectedAdessoSupporters = ""};
+            var record = new Record() 
+            { 
+                AllConnectedAdessoSupporters = "",
+                TicketClosedAt = ticketUrl.EndTime, 
+                TicketForwardedAt = ticketUrl.StartTime, 
+                TicketOpenedAt = ticketUrl.CreatedAt,
+                TicketId = ticketUrl.IncidentId
+            };
             //go through list items to get necessary information to create a record
             foreach (var li in listItems)
             {
@@ -332,15 +343,15 @@ namespace ConsoleApp1
                 record.TicketId = importantInfoPairs[Const.TicketId];
                 record.Description = importantInfoPairs[Const.Description];
                 record.TicketType = importantInfoPairs[Const.Category];
-                record.TicketOpenedAt = importantInfoPairs[Const.TicketOpenedAt];
+               // record.TicketOpenedAt = importantInfoPairs[Const.TicketOpenedAt];
                 record.Service = importantInfoPairs[Const.Service];
                 record.ServiceOffering  = importantInfoPairs[Const.ServiceOffering];
             }
 
-            if (String.IsNullOrWhiteSpace(record.TicketForwardedAt))
-            {
-                record.TicketForwardedAt = importantInfoPairs[Const.ForwardedAt];
-            }
+            //if (String.IsNullOrWhiteSpace(record.TicketForwardedAt))
+            //{
+            //    record.TicketForwardedAt = importantInfoPairs[Const.ForwardedAt];
+            //}
 
             if (String.IsNullOrWhiteSpace(record.ReactionTime))
             {
@@ -351,7 +362,7 @@ namespace ConsoleApp1
                 record.ResolutionTime = importantInfoPairs[Const.ResolutionTime];
             }
             record.Status = importantInfoPairs[Const.State];
-            record.TicketClosedAt = importantInfoPairs[Const.TicketClosedAt];
+            //record.TicketClosedAt = importantInfoPairs[Const.TicketClosedAt];
             record.Application = importantInfoPairs[Const.Application];
             record.ColleagueName = importantInfoPairs[Const.AssignedTo];
             var index = record.ColleagueName.IndexOf("was");
@@ -476,7 +487,7 @@ namespace ConsoleApp1
             else if (field.Contains("Assigned to"))
             {
                 var assignedTo = field.Substring(field.IndexOf("Assigned to") + 11).Trim();
-                if (importantInfoDict[Const.AssignmentGroup].Contains("adesso") && !field.StartsWith("[Empty]"))
+                if (Helper.IsGroupFromAdesso(importantInfoDict[Const.AssignmentGroup])&& !field.StartsWith("[Empty]"))
                 {
                     shouldAddReactionTime = true;
                     importantInfoDict[Const.AssignedTo] = assignedTo;
@@ -498,23 +509,35 @@ namespace ConsoleApp1
             return "";
         }
 
-        private void GetTaskItemsUrls(IEnumerable<IWebElement> trs, List<string> urlList)
+        private void GetTaskItemsUrls(IEnumerable<IWebElement> trs, List<SearchResultData> urlList)
         {
-            try
+            var t = String.Empty;
+            foreach (var tr in trs)
             {
-                foreach (var tr in trs)
+                try
                 {
-                    var t = tr.Text;
-                    var firstTd = tr.FindElements(By.TagName("td"))[2];
-                    var link = firstTd.FindElement(By.TagName("a"));
+                    t = tr.Text;
+                    var urlTd = tr.FindElements(By.TagName("td"))[4]; 
+                    var incidentId = urlTd.Text.Replace("Incident:","").Trim();
+                    if (!exsitingIds.Contains(incidentId))
+                    {
+                        File.AppendAllLines("unexisting.txt", new List<string>(){ incidentId });
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                    var link = urlTd.FindElement(By.TagName("a"));
                     var taskUrl = link.GetAttribute("href");
-                    urlList.Add(taskUrl);
+                    var startDate = tr.FindElements(By.TagName("td"))[6].Text;
+                    var endDate = tr.FindElements(By.TagName("td"))[7].Text;
+                    var createdAt = tr.FindElements(By.TagName("td"))[2].Text;
+                    urlList.Add(new SearchResultData() {IncidentId = incidentId, Url = taskUrl, StartTime = startDate, EndTime = endDate, CreatedAt = createdAt});
                 }
-            }
-            catch (Exception ex)
-            {
-                _log.Error("Didn't retrieve url. Exception " + ex);
-                throw;
+                catch (Exception ex)
+                {
+                    _log.Error("Didn't retrieve url. Exception " + ex + "Row text: " + t);
+                }
             }
         }
         private void Setup()
@@ -524,13 +547,13 @@ namespace ConsoleApp1
 
             //edgeOptions.AddArguments($"--user-data-dir={profileDirectory}");
             //edgeOptions.AddArguments($"--headless");
-            //edgeOptions.AddArguments("--profile-directory=Default");
+            edgeOptions.AddArguments("--profile-directory=Default");
             //edgeOptions.AddArgument("user-data-dir=" + profileDirectory);
 
             //var edgeOptions2 = new EdgeOptions();
             //edgeOptions.AddArgument("--user-data-dir=C:\\ChromeData");
             //edgeOptions.AddArgument("--remote-debugging-port=9222");
-            edgeOptions.DebuggerAddress = "127.0.0.1:5555";
+            //edgeOptions.DebuggerAddress = "127.0.0.1:5555";
 
             //  driver = new EdgeDriver(edgeOptions);
             driver = new ChromeDriver(edgeOptions);

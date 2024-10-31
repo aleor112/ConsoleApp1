@@ -40,10 +40,10 @@ namespace TestProject1
         public static string bluenetStr = "bluenet";
         public static string capacityToolStr = "capacitytool";
         public static string ccptStr = "ccpt";
-        public static int numberOfTabs = 10;
+        public static int numberOfTabs = 20;
         public static List<string> applicationWords = new List<string>() { "onlineapplication","sales2go","cad library","cadlibrary","bluenet", 
-            "speiseleitsystem","confservice","citavi", " cpo ", " mpm ", "machinelogbook", "qmsm","qmnotification","q3notification", "maintenance other" };
-        public static List<string> adessoAssignemntGroupKeyWords = new List<string>() { "adesso", "bluenet" };
+            "speiseleitsystem","confservice","citavi", " cpo ", " mpm ", "machinelogbook", "qmsm","qmnotification","q3notification", "maintenance other", "fas" };
+        public static List<string> adessoAssignemntGroupKeyWords = new List<string>() { "adesso", "bluenet", "non it - fas" };
 
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Aspose.Cells;
+using Aspose.Cells.Tables;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,6 +40,27 @@ namespace ConsoleApp1
             book.Save($"ticketReport_time_{DateTime.Now.ToString("yyyyMMdd_HHmmss")}_fromRow_{suffix}.xlsx");
         }
 
+        public static List<string> GetIdsFromExcel(string filename)
+        {
+            var resultIDs = new List<string>();
+            // Load the Excel file
+            Workbook workbook = new Workbook(filename);
+
+            // Access the first worksheet
+            Worksheet worksheet = workbook.Worksheets[0];
+
+            // Access the first list object (table) in the worksheet
+            var maxDataRows = worksheet.Cells.MaxDataRow;
+            // Loop through the rows in the table
+            for (int i = 1; i < maxDataRows; i++)
+            {
+                // Pring cell value
+                var id = worksheet.Cells[i, 0].Value as string;
+                resultIDs.Add(id);
+            }
+
+            return resultIDs;
+        }
 
         static void InsertHeaderRow(Worksheet worksheet)
         {
