@@ -32,6 +32,9 @@ namespace ConsoleApp1
         bool hasUserChanged = false;
         bool shouldAddForwadedTime = false;
         string urlWithPlaceholder = "";
+        int ticketsProcessed = 0;
+        List<Record> _records;
+        List<string> processedTicketNumbers = new List<string>();
         ILog _log;
         List<string> exsitingIds = new List<string>();
         public ReportGenerator(ILog log)
@@ -50,13 +53,13 @@ namespace ConsoleApp1
             //urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=stateNOT%20IN3%2C4%2C7%2C8%2C10%2C9%2C6%2C103%2C104%2C106%2C107%5Eassignment_groupLIKEMSP%20-%20adesso/InternalApplications%5Eshort_descriptionNOT%20LIKEITD%20&sysparm_first_row={0}&sysparm_view=";
             //one year ago urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONOne%20year%20ago@javascript:gs.beginningOfOneYearAgo()@javascript:gs.endOfOneYearAgo()&sysparm_first_row={0}&sysparm_view=%27";
             //last week urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
-            var stateRowProcessed = StateManager.ReadApplicationState();
-            _log.Info("Retrieved row state " + stateRowProcessed);
+            var startFromPosition = StateManager.ReadApplicationState();
+            _log.Info("Retrieved row state " + startFromPosition);
             //Const.urlPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
             var url = "";
-            if(stateRowProcessed != -1)
+            if(startFromPosition != -1)
             {
-                url = String.Format(Const.urlPlaceholder, stateRowProcessed);
+                url = String.Format(Const.urlPlaceholder, startFromPosition);
             }
             else
             {
@@ -76,24 +79,35 @@ namespace ConsoleApp1
             driver.Navigate().GoToUrl(url);
             
             //retrieve links
-            List<SearchResultData> urlsForTicketDetails = new List<SearchResultData>();
-            var ticketRowsProcessed = GetTicketUrls(urlsForTicketDetails);
+            List<SearchResultData> ticketUrlsList = new List<SearchResultData>();
+            var ticketsCount = GetTicketUrls(ticketUrlsList);
 
-            _log.Info("Last ticket row retrieved" + ticketRowsProcessed);
+            _log.Info("Last ticket row retrieved" + ticketsCount);
 
-            var records = GenerateRecords(urlsForTicketDetails);
+            GenerateRecords(ticketUrlsList);
             //generate excel from records
-            ExcelHelper.GenerateExcel(records, ticketRowsProcessed.ToString());
-
-            StateManager.SaveApplicationState(ticketRowsProcessed);
+            ExcelHelper.GenerateExcel(_records, ticketsCount.ToString());
+            StateManager.SaveApplicationState(ticketsCount);
 
         }
 
-
-
-        private List<Record> GenerateRecords(List<SearchResultData> urlsForTicketDetails)
+        public void OnExitProgram()
         {
-            List<Record> records = new List<Record>();
+            try
+            {
+                var startPosition = StateManager.ReadApplicationState();
+                ExcelHelper.GenerateExcel(_records, (startPosition + ticketsProcessed).ToString());
+                StateManager.SaveApplicationState(startPosition + ticketsProcessed);
+            }
+            catch(Exception ex)
+            {
+                _log.Error("Error while saving state on exit " + ex);
+            }
+        }
+
+        private List<Record> GenerateRecords(List<SearchResultData> ticketUrlsList)
+        {
+            _records = new List<Record>();
             var counter = 0;
 
             // generate records
@@ -103,7 +117,11 @@ namespace ConsoleApp1
                 {
                     driver.SwitchTo().Window(driver.WindowHandles[0]);
                     //var nextUrls = urlsForTicketDetails.Skip((counter + 1) * Const.numberOfTabs).Take(Const.numberOfTabs).ToList();
-                    var urls = urlsForTicketDetails.Skip(counter * Const.numberOfTabs).Take(Const.numberOfTabs).ToList();
+                    var urls = ticketUrlsList
+                        .Skip(counter * Const.numberOfTabs)
+                        .Take(Const.numberOfTabs)
+                        .Where(url => !processedTicketNumbers.Contains(url.TicketNumber))
+                        .ToList();
                     LoadUrlsIntoTabs(urls);
                     for (var i = 0; i < urls.Count; i++)
                     {
@@ -111,7 +129,8 @@ namespace ConsoleApp1
                         driver.SwitchTo().Window(driver.WindowHandles[urls.Count - i]);
                         try
                         {
-                            GenerateRecordsFromUrl(url, records);
+                            GenerateRecordsFromUrl(url, _records);
+                            ticketsProcessed++;
                         }
                         catch (Exception ex)
                         {
@@ -126,11 +145,11 @@ namespace ConsoleApp1
                 }
                 counter++;
             }
-            while (counter * Const.numberOfTabs < urlsForTicketDetails.Count);
+            while (counter * Const.numberOfTabs < ticketUrlsList.Count);
 
 
             driver.SwitchTo().Window(driver.WindowHandles[0]);
-            return records;
+            return _records;
         }
 
         private void LoadUrlsIntoTabs(List<SearchResultData> urls)
@@ -155,7 +174,7 @@ namespace ConsoleApp1
             }
         }
 
-        private int GetTicketUrls(List<SearchResultData> urlsForTicketDetails)
+        private int GetTicketUrls(List<SearchResultData> ticketUrlsList)
         {
             var totalRowsElement = driver.FindElement(By.CssSelector(".list_nav_bottom "));
             var totalRowsText = totalRowsElement.Text;
@@ -184,14 +203,14 @@ namespace ConsoleApp1
                     {
                         prevTotalRowsText = totalRowsText;
                         var table = driver.FindElement(By.Id("metric_instance_table"));
-                        var rows = table.FindElements(By.TagName("tr")).Skip(2);
-                        GetTaskItemsUrls(rows, urlsForTicketDetails);
-                        if(urlsForTicketDetails.Count >= Const.BatchSizeTicketGenerate) 
+                        var tableRowsHtml = table.FindElements(By.TagName("tr")).Skip(2);
+                        GetTicketUrls(tableRowsHtml, ticketUrlsList);
+                        if(ticketUrlsList.Count >= Const.BatchSizeTicketGenerate) 
                         {
-                            var records = GenerateRecords(urlsForTicketDetails);
+                            var records = GenerateRecords(ticketUrlsList);
                             ExcelHelper.GenerateExcel(records, ticketRowsProcessed.ToString());
-                            ticketRowsProcessed += urlsForTicketDetails.Count;
-                            urlsForTicketDetails.Clear();
+                            ticketRowsProcessed += ticketUrlsList.Count;
+                            ticketUrlsList.Clear();
 
                             //var url = String.Format(Const.urlPlaceholder, ticketRowsProcessed);
                             //driver.Navigate().GoToUrl(url);
@@ -288,7 +307,8 @@ namespace ConsoleApp1
                 TicketClosedAt = ticketUrl.EndTime, 
                 TicketForwardedAt = ticketUrl.StartTime, 
                 TicketOpenedAt = ticketUrl.CreatedAt,
-                TicketId = ticketUrl.IncidentId
+                TicketNumber = ticketUrl.TicketNumber,
+                TicketId = ticketUrl.TicketId
             };
             //go through list items to get necessary information to create a record
             foreach (var li in listItems)
@@ -308,14 +328,18 @@ namespace ConsoleApp1
                 if (shouldUpdateReacord)
                 {
                     UpdateRecordObject(importantInfoDict, record);
-                    if (!String.IsNullOrWhiteSpace(record.TicketId))
+                    if (!String.IsNullOrWhiteSpace(record.TicketNumber))
                     {
                         importantInfoDict[Const.HasCreatedRecord] = "true";
                     }
                 }
             }
 
-            if(!String.IsNullOrWhiteSpace(record.TicketId)) records.Add(record);
+            if(!String.IsNullOrWhiteSpace(record.TicketNumber))
+            {
+                processedTicketNumbers.Add(record.TicketNumber);
+                records.Add(record);
+            }
 
             if (!String.IsNullOrWhiteSpace(importantInfoDict[Const.HasAdessoGroup]) && String.IsNullOrWhiteSpace(importantInfoDict[Const.HasCreatedRecord]))
             {
@@ -335,12 +359,12 @@ namespace ConsoleApp1
             {
                 return;
             }
-            if (String.IsNullOrWhiteSpace(record.TicketId))
+            if (!String.IsNullOrWhiteSpace(record.TicketNumber))
             {
                 record.AssignmentTime = importantInfoPairs[Const.AssignmentTime];
                 record.Priority = importantInfoPairs[Const.Priority];
                 record.ColleagueName = importantInfoPairs[Const.AssignedTo];
-                record.TicketId = importantInfoPairs[Const.TicketId];
+                record.TicketNumber = importantInfoPairs[Const.TicketId];
                 record.Description = importantInfoPairs[Const.Description];
                 record.TicketType = importantInfoPairs[Const.Category];
                // record.TicketOpenedAt = importantInfoPairs[Const.TicketOpenedAt];
@@ -509,7 +533,7 @@ namespace ConsoleApp1
             return "";
         }
 
-        private void GetTaskItemsUrls(IEnumerable<IWebElement> trs, List<SearchResultData> urlList)
+        private void GetTicketUrls(IEnumerable<IWebElement> trs, List<SearchResultData> urlList)
         {
             var t = String.Empty;
             foreach (var tr in trs)
@@ -532,7 +556,7 @@ namespace ConsoleApp1
                     var startDate = tr.FindElements(By.TagName("td"))[6].Text;
                     var endDate = tr.FindElements(By.TagName("td"))[7].Text;
                     var createdAt = tr.FindElements(By.TagName("td"))[2].Text;
-                    urlList.Add(new SearchResultData() {IncidentId = incidentId, Url = taskUrl, StartTime = startDate, EndTime = endDate, CreatedAt = createdAt});
+                    urlList.Add(new SearchResultData() {TicketNumber = incidentId, Url = taskUrl, StartTime = startDate, EndTime = endDate, CreatedAt = createdAt});
                 }
                 catch (Exception ex)
                 {

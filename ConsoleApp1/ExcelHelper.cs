@@ -20,7 +20,7 @@ namespace ConsoleApp1
             Worksheet sheet = book.Worksheets[0];
             InsertHeaderRow(sheet);
              sheet.Cells.ImportCustomObjects((System.Collections.ICollection)records,
-                 new string[] {nameof(Record.TicketId),nameof(Record.TicketType),nameof(Record.Application),nameof(Record.Service),nameof(Record.ServiceOffering),
+                 new string[] {nameof(Record.TicketNumber),nameof(Record.TicketId),nameof(Record.TicketType),nameof(Record.Application),nameof(Record.Service),nameof(Record.ServiceOffering),
                      nameof(Record.Priority),nameof(Record.Status),nameof(Record.TicketOpenedAt),
                      nameof(Record.TicketClosedAt),nameof(Record.TicketForwardedAt), nameof(Record.LastAdessoSupporter), nameof(Record.AllConnectedAdessoSupporters),
                      nameof(Record.AssignmentTime),nameof(Record.ReactionTime), nameof(Record.CurrentAssignmentGroup), nameof(Record.FirstAdessoAssignmentGroup), nameof(Record.LastAdessoAssignmentGroup), 
@@ -65,7 +65,7 @@ namespace ConsoleApp1
         static void InsertHeaderRow(Worksheet worksheet)
         {
             // Define header row data
-            string[] headers = { "Ticket Id","Ticket type","Application","Service","Service offering","Prio","Status","Ticket opened at","Ticket closed at","Ticket forwarded at", "Last adesso supporter", "All connected adesso supporters", "adesso assignment time",
+            string[] headers = { "Ticket Number","Ticket id","Ticket type","Application","Service","Service offering","Prio","Status","Ticket opened at","Ticket closed at","Ticket forwarded at", "Last adesso supporter", "All connected adesso supporters", "adesso assignment time",
                     "adesso first response time", "current assignment group", "first adesso assignment group", "last adesso assignment group", "related with SP 2013 Cloud Move", "related with Repair Monitor",
                 "related with LTS", "related with internal applications", "related with ccpt", "related with capacity tool","related with bluenet", "count of related Assigment Groups" };
 

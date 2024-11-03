@@ -33,6 +33,7 @@ class Program
         ILog log = LogManager.GetLogger(typeof(Program));
 
         var generator = new ReportGenerator(log);
+        AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => generator.OnExitProgram();
         generator.GenerateReport();
 
 

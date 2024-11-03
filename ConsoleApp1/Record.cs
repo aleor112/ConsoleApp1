@@ -85,9 +85,9 @@ namespace TestProject1
         public string ReactionTime { get; set; }
         public string ResolutionTime { get; set; }
         public string AffectedApplication { get; set; }
-        public string TicketId { get; set; }
+        public string TicketNumber { get; set; }
         public string Description { get; set;}
-
+        public string TicketId { get;set;}
         public bool RelatedWithInternalApplications { get; set; }
         public bool RelatedWithBluenet { get; set; }
         public bool RelatedWithCCPT { get; set; }
