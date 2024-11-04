@@ -22,6 +22,7 @@ class Program
             .Build();
 
         TestProject1.Const.urlPlaceholder = configuration["urlWithPlaceholder"];
+        TestProject1.Const.SleepIntervalBetweenTabLoadingInSeconds = int.Parse(configuration["SleepIntervalBetweenTabLoadingInSeconds"]);
         Console.WriteLine("My url is: " + TestProject1.Const.urlPlaceholder);
         // Configure log4net
         var log4netConfig = new FileInfo("log4net.config");

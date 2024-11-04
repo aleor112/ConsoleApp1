@@ -9,6 +9,7 @@ namespace TestProject1
     public static class Const
     {
         public static string urlPlaceholder = "";
+        public static int SleepIntervalBetweenTabLoadingInSeconds = 10;
         public static int BatchSizeTicketGenerate = 100;
         public static int TicketsPerPage = 100;
         public static string AssignedTo = "AssignedTo";

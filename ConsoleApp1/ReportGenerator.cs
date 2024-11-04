@@ -144,6 +144,7 @@ namespace ConsoleApp1
                     _log.Error($"Error while generating records {e}");
                 }
                 counter++;
+                Thread.Sleep(Const.SleepIntervalBetweenTabLoadingInSeconds * 1000);
             }
             while (counter * Const.numberOfTabs < ticketUrlsList.Count);
 
