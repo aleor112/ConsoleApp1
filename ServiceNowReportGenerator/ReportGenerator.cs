@@ -29,9 +29,9 @@ namespace ConsoleApp1
         bool shouldAddReactionTime = false;
         bool shouldUpdateReacord = false;
         bool shouldAddClosedTime = false;
-        bool hasUserChanged = false;
+        //bool hasUserChanged = false;
         bool shouldAddForwadedTime = false;
-        string urlWithPlaceholder = "";
+        //string urlWithPlaceholder = "";
         int ticketsProcessed = 0;
         List<Record> _records;
         List<string> processedTicketNumbers = new List<string>();
@@ -246,7 +246,7 @@ namespace ConsoleApp1
 
         private void GenerateRecordsFromUrl(SearchResultData ticketUrl, List<Record> records)
         {
-            var ticketIdElements = driver.FindElement(By.CssSelector("#sys_readonly\\.incident\\.number, #sys_readonly\\.sc_req_item\\.number"));
+            var ticketIdElements = driver.FindElement(By.CssSelector("#sys_readonly\\.incident\\.number, #sys_readonly\\.sc_req_item\\.number, #sys_readonly\\.sc_task\\.number"));
             var ticketId = ticketIdElements.GetDomAttribute("value");
             var serviceElement = driver.TryGetElement(By.CssSelector("#sys_display\\.sc_req_item\\.business_service, #sys_display\\.incident\\.business_service"));
             var service = serviceElement?.GetDomAttribute("value");
@@ -301,7 +301,10 @@ namespace ConsoleApp1
                     importantInfoDict[Const.Category] = "ITD";
                 }
             }
-
+            if (ticketId.StartsWith("SC"))
+            {
+                importantInfoDict[Const.Category] = "SCTask";
+            }
             var record = new Record() 
             { 
                 AllConnectedAdessoSupporters = "",
