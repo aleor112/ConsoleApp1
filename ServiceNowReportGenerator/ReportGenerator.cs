@@ -23,7 +23,7 @@ namespace ConsoleApp1
 {
     public class ReportGenerator
     {
-        ChromeDriver driver;
+        EdgeDriver driver;
         bool shouldAddAssignmentTime = false;
         bool shouldAddResolvedTime = false;
         bool shouldAddReactionTime = false;
@@ -570,21 +570,21 @@ namespace ConsoleApp1
         }
         private void Setup()
         {
-            var edgeOptions = new ChromeOptions();
+            //var edgeOptions = new ChromeOptions();
             //string profileDirectory = @"C:\Users\astefanov\AppData\Local\Microsoft\Edge\User Data";
 
             //edgeOptions.AddArguments($"--user-data-dir={profileDirectory}");
             //edgeOptions.AddArguments($"--headless");
-            edgeOptions.AddArguments("--profile-directory=Default");
+            //edgeOptions.AddArguments("--profile-directory=Default");
             //edgeOptions.AddArgument("user-data-dir=" + profileDirectory);
 
-            //var edgeOptions2 = new EdgeOptions();
+            var edgeOptions2 = new EdgeOptions();
             //edgeOptions.AddArgument("--user-data-dir=C:\\ChromeData");
             //edgeOptions.AddArgument("--remote-debugging-port=9222");
             //edgeOptions.DebuggerAddress = "127.0.0.1:5555";
 
-            //  driver = new EdgeDriver(edgeOptions);
-            driver = new ChromeDriver(edgeOptions);
+            driver = new EdgeDriver(edgeOptions2);
+            //driver = new ChromeDriver(edgeOptions);
 
             Trace.Listeners.Add(new ConsoleTraceListener());
         }
