@@ -32,6 +32,8 @@ namespace ConsoleApp1
         //bool hasUserChanged = false;
         bool shouldAddForwadedTime = false;
         //string urlWithPlaceholder = "";
+        int urlsProcessed = 0;
+        int startFromTicketNumber = 0;
         int ticketsProcessed = 0;
         List<Record> _records;
         List<string> processedTicketNumbers = new List<string>();
@@ -53,13 +55,13 @@ namespace ConsoleApp1
             //urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=stateNOT%20IN3%2C4%2C7%2C8%2C10%2C9%2C6%2C103%2C104%2C106%2C107%5Eassignment_groupLIKEMSP%20-%20adesso/InternalApplications%5Eshort_descriptionNOT%20LIKEITD%20&sysparm_first_row={0}&sysparm_view=";
             //one year ago urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONOne%20year%20ago@javascript:gs.beginningOfOneYearAgo()@javascript:gs.endOfOneYearAgo()&sysparm_first_row={0}&sysparm_view=%27";
             //last week urlWithPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
-            var startFromPosition = StateManager.ReadApplicationState();
-            _log.Info("Retrieved row state " + startFromPosition);
+            startFromTicketNumber = StateManager.ReadApplicationState();
+            _log.Info("Retrieved row state " + startFromTicketNumber);
             //Const.urlPlaceholder = "https://trumpf.service-now.com/task_list.do?sysparm_query=numberSTARTSWITHINC%5EORnumberSTARTSWITHRITM%5Esys_created_onONLast%20week@javascript:gs.beginningOfLastWeek()@javascript:gs.endOfLastWeek()&sysparm_first_row={0}&sysparm_view=";
             var url = "";
-            if(startFromPosition != -1)
+            if(startFromTicketNumber != -1)
             {
-                url = String.Format(Const.urlPlaceholder, startFromPosition);
+                url = String.Format(Const.urlPlaceholder, startFromTicketNumber);
             }
             else
             {
@@ -70,7 +72,7 @@ namespace ConsoleApp1
             Console.WriteLine("Log in with 2FA and press enter in console after that:");
             Console.ReadLine();
             //exsitingIds = ExcelHelper.GetIdsFromExcel("ticketReport_time_20240623_173045_fromRow_1.xlsx");
-            //var exsitingIds2 = ExcelHelper.GetIdsFromExcel("ticketReport_time_20240623_212530_fromRow_1316.xlsx");
+            //var exsitingIds2 = ExcelHelper.GetIdsFromExcel("ticketReport_time_20240623_212530_fromRow_13gt16.xlsx");
             //exsitingIds.AddRange(exsitingIds2);
             //OpenTabs(driver);
             //((IJavaScriptExecutor)driver).ExecuteScript("window.open();");
@@ -96,8 +98,8 @@ namespace ConsoleApp1
             try
             {
                 var startPosition = StateManager.ReadApplicationState();
-                ExcelHelper.GenerateExcel(_records, (startPosition + ticketsProcessed).ToString());
-                StateManager.SaveApplicationState(startPosition + ticketsProcessed);
+                ExcelHelper.GenerateExcel(_records, (startPosition + urlsProcessed).ToString());
+                StateManager.SaveApplicationState(startPosition + urlsProcessed);
             }
             catch(Exception ex)
             {
@@ -125,25 +127,35 @@ namespace ConsoleApp1
                     LoadUrlsIntoTabs(urls);
                     for (var i = 0; i < urls.Count; i++)
                     {
-                        var url = urls[i];
                         driver.SwitchTo().Window(driver.WindowHandles[urls.Count - i]);
-                        try
+                        //there might be duplicate ticket numbers in the urls list that we are taking so we do a second check if processedTicketNumbers contains 
+                        if (!processedTicketNumbers.Contains(urls[i].TicketNumber))
                         {
-                            GenerateRecordsFromUrl(url, _records);
-                            ticketsProcessed++;
-                        }
-                        catch (Exception ex)
-                        {
-                            _log.Error($"Task url {url} error: " + ex);
-                        }
+                            var url = urls[i];
+                            try
+                            {
+                                GenerateRecordsFromUrl(url, _records);
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Error($"Task url {url} error: " + ex);
+                            }
+                            processedTicketNumbers.Add(urls[i].TicketNumber);
+                        }  
                         driver.Close();
                     }
+                    urlsProcessed += Const.numberOfTabs;
                 }
                 catch (Exception e)
                 {
                     _log.Error($"Error while generating records {e}");
                 }
                 counter++;
+                if(_records.Count > Const.BatchSizeTicketGenerateExcel || counter * Const.numberOfTabs > ticketUrlsList.Count)
+                {
+                    ExcelHelper.GenerateExcel(_records, (startFromTicketNumber + urlsProcessed).ToString());
+                    _records.Clear();
+                }
                 Thread.Sleep(Const.SleepIntervalBetweenTabLoadingInSeconds * 1000);
             }
             while (counter * Const.numberOfTabs < ticketUrlsList.Count);
@@ -161,19 +173,19 @@ namespace ConsoleApp1
             }
         }
 
-        private void RedirectTab(string url)
-        {
-            ((IJavaScriptExecutor)driver).ExecuteAsyncScript($"window.location = '{url}'");
-        }
+        //private void RedirectTab(string url)
+        //{
+        //    ((IJavaScriptExecutor)driver).ExecuteAsyncScript($"window.location = '{url}'");
+        //}
 
-        private void CloseTabs(List<string> urls)
-        {
-            for (int i = 1; i <= urls.Count; i++)
-            {
-                driver.SwitchTo().Window(driver.WindowHandles[i]);
-                driver.Close();
-            }
-        }
+        //private void CloseTabs(List<string> urls)
+        //{
+        //    for (int i = 1; i <= urls.Count; i++)
+        //    {
+        //        driver.SwitchTo().Window(driver.WindowHandles[i]);
+        //        driver.Close();
+        //    }
+        //}
 
         private int GetTicketUrls(List<SearchResultData> ticketUrlsList)
         {
@@ -206,11 +218,9 @@ namespace ConsoleApp1
                         var table = driver.FindElement(By.Id("metric_instance_table"));
                         var tableRowsHtml = table.FindElements(By.TagName("tr")).Skip(2);
                         GetTicketUrls(tableRowsHtml, ticketUrlsList);
-                        if(ticketUrlsList.Count >= Const.BatchSizeTicketGenerate) 
+                        if(ticketUrlsList.Count >= Const.BatchSizeTicketGenerateExcel) 
                         {
                             var records = GenerateRecords(ticketUrlsList);
-                            ExcelHelper.GenerateExcel(records, ticketRowsProcessed.ToString());
-                            ticketRowsProcessed += ticketUrlsList.Count;
                             ticketUrlsList.Clear();
 
                             //var url = String.Format(Const.urlPlaceholder, ticketRowsProcessed);
@@ -246,8 +256,7 @@ namespace ConsoleApp1
 
         private void GenerateRecordsFromUrl(SearchResultData ticketUrl, List<Record> records)
         {
-            var ticketIdElements = driver.FindElement(By.CssSelector("#sys_readonly\\.incident\\.number, #sys_readonly\\.sc_req_item\\.number, #sys_readonly\\.sc_task\\.number"));
-            var ticketId = ticketIdElements.GetDomAttribute("value");
+            var ticketId = ticketUrl.Url.Substring(ticketUrl.Url.IndexOf("sys_id=") + 7);
             var serviceElement = driver.TryGetElement(By.CssSelector("#sys_display\\.sc_req_item\\.business_service, #sys_display\\.incident\\.business_service"));
             var service = serviceElement?.GetDomAttribute("value");
             var serviceOfferingElement = driver.TryGetElement(By.CssSelector("#sys_display\\.sc_req_item\\.service_offering, #sys_display\\.incident\\.service_offering"));
@@ -368,10 +377,10 @@ namespace ConsoleApp1
                 record.AssignmentTime = importantInfoPairs[Const.AssignmentTime];
                 record.Priority = importantInfoPairs[Const.Priority];
                 record.ColleagueName = importantInfoPairs[Const.AssignedTo];
-                record.TicketNumber = importantInfoPairs[Const.TicketId];
+                //record.TicketNumber = importantInfoPairs[Const.TicketId];
                 record.Description = importantInfoPairs[Const.Description];
                 record.TicketType = importantInfoPairs[Const.Category];
-               // record.TicketOpenedAt = importantInfoPairs[Const.TicketOpenedAt];
+                //record.TicketOpenedAt = importantInfoPairs[Const.TicketOpenedAt];
                 record.Service = importantInfoPairs[Const.Service];
                 record.ServiceOffering  = importantInfoPairs[Const.ServiceOffering];
             }
